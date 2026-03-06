@@ -16,7 +16,7 @@ export class Game extends Scene {
     targetY: number = 0;
     moveDistance: number = 200;
     speed: number = 0.5;
-    currentAction: Array<String> = ["move", "explode", "move", "grow", "move", "shrink",];
+    currentAction: Array<String> = ["explode", "move", "grow", "move", "shrink"];
     actionIndex: number = 0;
     normalCharacterScale: number = 1;
     grownCharacterScale: number = 2.5;
@@ -29,21 +29,31 @@ export class Game extends Scene {
     moveDirY: number = 0;
     bounceBackSpeed: number = 800;
     keyDoors: Phaser.Physics.Arcade.StaticGroup;
+    trashCan: Phaser.Physics.Arcade.Image;
+    hasTrashCan: boolean = false;
+    isTrashCan: boolean = false;
+    exclusionZones: Phaser.Physics.Arcade.StaticGroup;
+    hasWon: boolean = false;
 
     constructor() {
         super('Game');
     }
 
     create() {
+
+        this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+            console.log(`x: ${pointer.x}, y: ${pointer.y}`);
+        });
+
         this.background = this.add.image(512, 384, 'background');
 
-        this.mainChar = this.physics.add.image(512, 300, 'plant').setScale(1);
+        this.mainChar = this.physics.add.image(100, 100, 'plant').setScale(1);
 
         // 2. Cast the body once for easy access
         this.mainBody = this.mainChar.body as Phaser.Physics.Arcade.Body;
 
         // 3. Set world boundaries so they don't fly off screen
-        this.mainChar.setCollideWorldBounds(true);
+        this.mainChar.setCollideWorldBounds(false);
 
         this.arrow = this.add.image(this.mainChar.x, this.mainChar.y, 'arrow').setDepth(101).setOrigin(0, 0.5).setScale(0.15);
 
@@ -60,13 +70,25 @@ export class Game extends Scene {
         keyGraphics.fillRect(0, 0, 32, 32);
         keyGraphics.generateTexture('key', 32, 32);
 
-        this.keyObject = this.physics.add.image(300, 400, 'key').setScale(0.5);
+        this.keyObject = this.physics.add.image(500, 70, 'key').setScale(0.5).setDepth(105)
 
         this.physics.add.overlap(this.mainChar, this.keyObject, () => {
             if (!this.hasKey) {
                 this.hasKey = true;
                 this.keyObject.destroy();
                 console.log('Key picked up! hasKey:', this.hasKey);
+            }
+        });
+
+        this.trashCan = this.physics.add.image(70, 700, 'trashcan').setScale(4);
+
+        this.physics.add.overlap(this.mainChar, this.trashCan, () => {
+            if (!this.hasTrashCan) {
+                this.hasTrashCan = true;
+                this.trashCan.destroy();
+                this.currentAction.push('move');
+                this.currentAction.push('trashcan');
+                console.log('Trashcan picked up! Actions:', this.currentAction);
             }
         });
 
@@ -81,10 +103,9 @@ export class Game extends Scene {
         redGraphics.generateTexture('wall_breakable', 32, 32);
 
         this.breakableWalls = this.physics.add.staticGroup();
-        this.breakableWalls.create(400, 300, 'wall_breakable').setScale(4, 1).refreshBody();
 
-        this.walls.create(200, 200, 'wall_color').setScale(4, 1).refreshBody();
-        this.walls.create(600, 400, 'wall_color').setScale(1, 4).refreshBody();
+
+
 
         const doorGraphics = this.make.graphics({ x: 0, y: 0 });
         doorGraphics.fillStyle(0xffff00);
@@ -92,7 +113,8 @@ export class Game extends Scene {
         doorGraphics.generateTexture('key_door', 32, 32);
 
         this.keyDoors = this.physics.add.staticGroup();
-        this.keyDoors.create(500, 200, 'key_door').setScale(1, 4).refreshBody();
+
+
 
         this.physics.add.collider(this.mainChar, this.walls, () => this.bounceBack());
         this.physics.add.collider(this.mainChar, this.breakableWalls, () => this.bounceBack());
@@ -100,6 +122,61 @@ export class Game extends Scene {
             if (this.hasKey) return;
             this.bounceBack();
         });
+
+        // Win detection — overlap fires when door body is disabled (hasKey = true)
+        this.physics.add.overlap(this.mainChar, this.keyDoors, () => {
+            if (this.hasKey && !this.hasWon) {
+                this.hasWon = true;
+                this.isMoving = false;
+                this.mainBody.setVelocity(0, 0);
+                EventBus.emit('player-wins');
+            }
+        });
+
+        // Top
+        this.walls.create(512, 16, 'wall_color').setScale(32, 1).refreshBody();
+        // Bottom
+        this.walls.create(512, 752, 'wall_color').setScale(32, 1).refreshBody();
+        // Left
+        this.walls.create(16, 384, 'wall_color').setScale(1, 24).refreshBody();
+        // Right
+        this.walls.create(1008, 284, 'wall_color').setScale(1, 24).refreshBody();
+        //Exit
+        this.keyDoors.create(1008, 700, 'key_door').setScale(1, 3).refreshBody();
+
+        this.walls.create(100, 200, 'wall_color').setScale(5, 1).refreshBody();
+        this.breakableWalls.create(160, 115, 'wall_breakable').setScale(1, 5).
+            refreshBody();
+
+        this.walls.create(250, 600, 'wall_color').setScale(1, 10).refreshBody();
+        this.walls.create(500, 600, 'wall_color').setScale(1, 10).refreshBody();
+        this.walls.create(750, 600, 'wall_color').setScale(1, 10).refreshBody();
+        this.walls.create(800, 460, 'wall_color').setScale(3, 1).refreshBody();
+
+        this.walls.create(400, 150, 'wall_color').setScale(1, 10).refreshBody();
+        this.walls.create(600, 150, 'wall_color').setScale(1, 10).refreshBody();
+
+        this.walls.create(980, 100, 'wall_color').setScale(3, 5).refreshBody();
+
+        this.walls.create(980, 300, 'wall_color').setScale(3, 5).refreshBody();
+
+        const exclusionGraphics = this.make.graphics({ x: 0, y: 0 });
+        exclusionGraphics.fillStyle(0xff00ff); // Purple
+        exclusionGraphics.fillRect(0, 0, 32, 32);
+        exclusionGraphics.generateTexture('exclusion_zone', 32, 32);
+
+        this.exclusionZones = this.physics.add.staticGroup();
+        this.exclusionZones.create(500, 144, 'exclusion_zone').setScale(5.5, 5.5).setAlpha(0).refreshBody();
+
+        this.physics.add.overlap(this.mainChar, this.exclusionZones, () => {
+            if (!this.isTrashCan) {
+                this.isMoving = false;
+                this.mainBody.setVelocity(0, 0);
+                this.mainBody.reset(100, 100);
+                this.mainChar.setPosition(100, 100);
+            }
+        });
+
 
         // explode animation
         this.anims.create({
@@ -111,7 +188,14 @@ export class Game extends Scene {
 
 
         spaceBar.on('down', () => {
-            switch (this.currentAction[this.actionIndex]) {
+            const action = this.currentAction[this.actionIndex];
+
+            if (this.isTrashCan && action !== 'move') {
+                this.actionIndex = 1;
+                return;
+            }
+
+            switch (action) {
                 case "move":
                     this.moveCharacter();
                     break;
@@ -124,15 +208,37 @@ export class Game extends Scene {
                 case "shrink":
                     this.shrinkCharacter();
                     break;
+                case "trashcan":
+                    this.becomeTrashCan();
+                    break;
             }
+
             if (this.actionIndex < this.currentAction.length - 1) {
                 this.actionIndex++;
             } else {
                 this.actionIndex = 0;
             }
         });
-
+        EventBus.on('reset-player', () => this.resetPlayer());
         EventBus.emit('current-scene-ready', this);
+    }
+
+    resetPlayer() {
+        this.isMoving = false;
+        this.hasWon = false;
+        this.mainBody.setVelocity(0, 0);
+        this.mainBody.reset(100, 100);
+        this.mainChar.setPosition(100, 100);
+        this.actionIndex = 0;
+
+        // Revert to plant if currently a trashcan
+        if (this.isTrashCan) {
+            this.isTrashCan = false;
+            this.mainChar.setTexture('plant').setScale(this.normalCharacterScale);
+            this.mainBody.setSize(this.mainChar.width, this.mainChar.height);
+        } else {
+            this.mainChar.setScale(this.normalCharacterScale);
+        }
     }
 
     moveCharacter() {
@@ -152,13 +258,26 @@ export class Game extends Scene {
         }
     }
 
+    becomeTrashCan() {
+        this.isTrashCan = true;
+        this.mainChar.setTexture('trashcan').setScale(4);
+        this.mainBody.setSize(this.mainChar.width, this.mainChar.height);
+
+        this.time.delayedCall(3000, () => {
+            this.isTrashCan = false;
+            this.mainChar.setTexture('plant').setScale(this.normalCharacterScale);
+            // Reset body size to plant's raw texture size
+            this.mainBody.setSize(this.mainChar.width, this.mainChar.height);
+            this.mainBody.reset(this.mainChar.x, this.mainChar.y);
+        });
+    }
     bounceBack() {
         if (!this.isMoving) return;
         this.isMoving = false;
         this.mainBody.setVelocity(0, 0);
 
-        let bounceX = this.mainChar.x - this.moveDirX * this.moveDistance / 2;
-        let bounceY = this.mainChar.y - this.moveDirY * this.moveDistance / 2;
+        let bounceX = this.mainChar.x - this.moveDirX * this.moveDistance / 1.5;
+        let bounceY = this.mainChar.y - this.moveDirY * this.moveDistance / 1.5;
 
         // Check all wall groups for overlap at the bounce destination
         const allWallGroups = [this.walls, this.breakableWalls, ...(!this.hasKey ? [this.keyDoors] : [])];

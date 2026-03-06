@@ -31,6 +31,7 @@ export class Preloader extends Scene {
         this.load.image('logo', 'logo.png');
         this.load.image('plant', 'plant.png');
         this.load.image('arrow', 'arrow.png');
+        this.load.image('trashcan', 'Trash.png');
         this.load.spritesheet('explosion', 'explosionAnimation.png', {
             frameWidth: 128,
             frameHeight: 128
