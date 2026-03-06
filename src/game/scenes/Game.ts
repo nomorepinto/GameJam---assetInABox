@@ -23,6 +23,12 @@ export class Game extends Scene {
     smallCharacterScale: number = 0.5;
     walls: Phaser.Physics.Arcade.StaticGroup;
     breakableWalls: Phaser.Physics.Arcade.StaticGroup;
+    hasKey: boolean = false;
+    keyObject: Phaser.Physics.Arcade.Image;
+    moveDirX: number = 0;
+    moveDirY: number = 0;
+    bounceBackSpeed: number = 800;
+    keyDoors: Phaser.Physics.Arcade.StaticGroup;
 
     constructor() {
         super('Game');
@@ -48,10 +54,26 @@ export class Game extends Scene {
         graphics.fillRect(0, 0, 32, 32);
         graphics.generateTexture('wall_color', 32, 32);
 
+        //key
+        const keyGraphics = this.make.graphics({ x: 0, y: 0 });
+        keyGraphics.fillStyle(0xffff00); // Yellow
+        keyGraphics.fillRect(0, 0, 32, 32);
+        keyGraphics.generateTexture('key', 32, 32);
+
+        this.keyObject = this.physics.add.image(300, 400, 'key').setScale(0.5);
+
+        this.physics.add.overlap(this.mainChar, this.keyObject, () => {
+            if (!this.hasKey) {
+                this.hasKey = true;
+                this.keyObject.destroy();
+                console.log('Key picked up! hasKey:', this.hasKey);
+            }
+        });
+
+        //walls
+
         this.walls = this.physics.add.staticGroup();
 
-        this.walls.create(200, 200, 'wall_color').setScale(4, 1).refreshBody();
-        this.walls.create(600, 400, 'wall_color').setScale(1, 4).refreshBody();
 
         const redGraphics = this.make.graphics({ x: 0, y: 0 });
         redGraphics.fillStyle(0xff0000);
@@ -61,17 +83,25 @@ export class Game extends Scene {
         this.breakableWalls = this.physics.add.staticGroup();
         this.breakableWalls.create(400, 300, 'wall_breakable').setScale(4, 1).refreshBody();
 
-        this.physics.add.collider(this.mainChar, this.walls, () => {
-            this.isMoving = false;
-            this.mainBody.setVelocity(0, 0);
+        this.walls.create(200, 200, 'wall_color').setScale(4, 1).refreshBody();
+        this.walls.create(600, 400, 'wall_color').setScale(1, 4).refreshBody();
+
+        const doorGraphics = this.make.graphics({ x: 0, y: 0 });
+        doorGraphics.fillStyle(0xffff00);
+        doorGraphics.fillRect(0, 0, 32, 32);
+        doorGraphics.generateTexture('key_door', 32, 32);
+
+        this.keyDoors = this.physics.add.staticGroup();
+        this.keyDoors.create(500, 200, 'key_door').setScale(1, 4).refreshBody();
+
+        this.physics.add.collider(this.mainChar, this.walls, () => this.bounceBack());
+        this.physics.add.collider(this.mainChar, this.breakableWalls, () => this.bounceBack());
+        this.physics.add.collider(this.mainChar, this.keyDoors, () => {
+            if (this.hasKey) return;
+            this.bounceBack();
         });
 
-        this.physics.add.collider(this.mainChar, this.breakableWalls, () => {
-            this.isMoving = false;
-            this.mainBody.setVelocity(0, 0);
-        });
-
-
+        // explode animation
         this.anims.create({
             key: 'explode_anim',
             frames: this.anims.generateFrameNumbers('explosion', { start: 0, end: 6 }),
@@ -107,18 +137,66 @@ export class Game extends Scene {
 
     moveCharacter() {
         if (!this.isMoving) {
-            // 1. Calculate the direction to the mouse
             const angle = Phaser.Math.Angle.Between(
                 this.mainChar.x, this.mainChar.y,
                 this.input.activePointer.x, this.input.activePointer.y
             );
 
-            // 2. Set the destination (Current Pos + Direction * Fixed Distance)
-            this.targetX = this.mainChar.x + Math.cos(angle) * this.moveDistance;
-            this.targetY = this.mainChar.y + Math.sin(angle) * this.moveDistance;
+            this.moveDirX = Math.cos(angle);
+            this.moveDirY = Math.sin(angle);
+
+            this.targetX = this.mainChar.x + this.moveDirX * this.moveDistance;
+            this.targetY = this.mainChar.y + this.moveDirY * this.moveDistance;
 
             this.isMoving = true;
         }
+    }
+
+    bounceBack() {
+        if (!this.isMoving) return;
+        this.isMoving = false;
+        this.mainBody.setVelocity(0, 0);
+
+        let bounceX = this.mainChar.x - this.moveDirX * this.moveDistance / 2;
+        let bounceY = this.mainChar.y - this.moveDirY * this.moveDistance / 2;
+
+        // Check all wall groups for overlap at the bounce destination
+        const allWallGroups = [this.walls, this.breakableWalls, ...(!this.hasKey ? [this.keyDoors] : [])];
+
+        allWallGroups.forEach((group) => {
+            group.getChildren().forEach((wall) => {
+                const wallBody = (wall as Phaser.Physics.Arcade.Image).body as Phaser.Physics.Arcade.StaticBody;
+
+                const distX = bounceX - wallBody.center.x;
+                const distY = bounceY - wallBody.center.y;
+
+                const minDistX = (wallBody.width / 2) + (this.mainChar.displayWidth / 2);
+                const minDistY = (wallBody.height / 2) + (this.mainChar.displayHeight / 2);
+
+                if (Math.abs(distX) < minDistX && Math.abs(distY) < minDistY) {
+                    // Bounce destination overlaps a wall, push it out
+                    const pushX = distX < 0 ? -(minDistX - Math.abs(distX)) : (minDistX - Math.abs(distX));
+                    const pushY = distY < 0 ? -(minDistY - Math.abs(distY)) : (minDistY - Math.abs(distY));
+
+                    if (Math.abs(pushX) < Math.abs(pushY)) {
+                        bounceX += pushX;
+                    } else {
+                        bounceY += pushY;
+                    }
+                }
+            });
+        });
+
+        this.tweens.add({
+            targets: this.mainChar,
+            x: bounceX,
+            y: bounceY,
+            duration: this.bounceBackSpeed,
+            ease: 'Cubic.out',
+            onUpdate: () => {
+                this.mainBody.reset(this.mainChar.x, this.mainChar.y);
+            }
+        });
     }
 
     pushAwayFromWalls(group: Phaser.Physics.Arcade.StaticGroup, targetWidth: number, targetHeight: number) {
@@ -207,7 +285,13 @@ export class Game extends Scene {
     }
 
     update(time: number, delta: number) {
+
         if (!this.mainBody) return; // Type Guard
+
+        this.keyDoors.getChildren().forEach((door) => {
+            const body = (door as Phaser.Physics.Arcade.Image).body as Phaser.Physics.Arcade.StaticBody;
+            body.enable = !this.hasKey;
+        });
 
         this.physics.collide(this.mainChar, this.walls);
         this.physics.collide(this.mainChar, this.breakableWalls);
