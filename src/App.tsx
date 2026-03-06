@@ -29,8 +29,6 @@ function App() {
         EventBus.emit('reset-player');
     };
 
-    /*
-
     if (!showGame) {
         return (
             <div className={isFadingOut ? styles.fadeOut : ''}>
@@ -38,8 +36,6 @@ function App() {
             </div>
         );
     }
-
-    */
 
     return (
         <div id="app" className={`${styles.fadeIn} ${styles.gameWrapper}`}>
@@ -104,7 +100,7 @@ function App() {
                             className={styles.playAgainButton}
                             onClick={handlePlayAgain}
                         >
-                            ▶ PLAY AGAIN
+                            REFRESH TO PLAY AGAIN
                         </button>
                     </div>
                 </div>

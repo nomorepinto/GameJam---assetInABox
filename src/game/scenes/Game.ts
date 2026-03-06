@@ -60,7 +60,7 @@ export class Game extends Scene {
         const spaceBar = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
 
         const graphics = this.make.graphics({ x: 0, y: 0 });
-        graphics.fillStyle(0x888888); // Grey color
+        graphics.fillStyle(0xbdcdde); // Grey color
         graphics.fillRect(0, 0, 32, 32);
         graphics.generateTexture('wall_color', 32, 32);
 
@@ -121,16 +121,6 @@ export class Game extends Scene {
         this.physics.add.collider(this.mainChar, this.keyDoors, () => {
             if (this.hasKey) return;
             this.bounceBack();
-        });
-
-        // Win detection — overlap fires when door body is disabled (hasKey = true)
-        this.physics.add.overlap(this.mainChar, this.keyDoors, () => {
-            if (this.hasKey && !this.hasWon) {
-                this.hasWon = true;
-                this.isMoving = false;
-                this.mainBody.setVelocity(0, 0);
-                EventBus.emit('player-wins');
-            }
         });
 
         // Top
@@ -225,7 +215,6 @@ export class Game extends Scene {
 
     resetPlayer() {
         this.isMoving = false;
-        this.hasWon = false;
         this.mainBody.setVelocity(0, 0);
         this.mainBody.reset(100, 100);
         this.mainChar.setPosition(100, 100);
@@ -411,6 +400,19 @@ export class Game extends Scene {
             const body = (door as Phaser.Physics.Arcade.Image).body as Phaser.Physics.Arcade.StaticBody;
             body.enable = !this.hasKey;
         });
+
+        // Win condition — player enters exit zone with key
+        if (
+            this.hasKey &&
+            !this.hasWon &&
+            this.mainChar.x >= 990 && this.mainChar.x <= 1022 &&
+            this.mainChar.y >= 669 && this.mainChar.y <= 735
+        ) {
+            this.hasWon = true;
+            this.isMoving = false;
+            this.mainBody.setVelocity(0, 0);
+            EventBus.emit('player-wins');
+        }
 
         this.physics.collide(this.mainChar, this.walls);
         this.physics.collide(this.mainChar, this.breakableWalls);

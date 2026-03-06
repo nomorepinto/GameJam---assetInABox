@@ -32,6 +32,9 @@ export class Preloader extends Scene {
         this.load.image('plant', 'plant.png');
         this.load.image('arrow', 'arrow.png');
         this.load.image('trashcan', 'Trash.png');
+        this.load.image('officepartition', 'office-partitions-2.png');
+        this.load.image('sink', 'sink.png');
+        this.load.image('printer', 'printer.png');
         this.load.spritesheet('explosion', 'explosionAnimation.png', {
             frameWidth: 128,
             frameHeight: 128
