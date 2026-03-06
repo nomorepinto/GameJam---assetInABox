@@ -70,6 +70,12 @@ export class Game extends Scene {
         keyGraphics.fillRect(0, 0, 32, 32);
         keyGraphics.generateTexture('key', 32, 32);
 
+
+        const officepartition = this.make.graphics({ x: 0, y: 0 });
+        officepartition.fillStyle(0x804b34);
+        officepartition.fillRect(0, 0, 32, 32);
+        officepartition.generateTexture('officepartition', 32, 32);
+
         this.keyObject = this.physics.add.image(500, 70, 'key').setScale(0.5).setDepth(105)
 
         this.physics.add.overlap(this.mainChar, this.keyObject, () => {
@@ -138,17 +144,17 @@ export class Game extends Scene {
         this.breakableWalls.create(160, 115, 'wall_breakable').setScale(1, 5).
             refreshBody();
 
-        this.walls.create(250, 600, 'wall_color').setScale(1, 10).refreshBody();
-        this.walls.create(500, 600, 'wall_color').setScale(1, 10).refreshBody();
+        this.walls.create(250, 600, 'officepartition').setDisplaySize(32, 32 * 10).setScale(1, 10).refreshBody();
+        this.walls.create(500, 600, 'officepartition').setScale(1, 10).refreshBody();
         this.walls.create(750, 600, 'wall_color').setScale(1, 10).refreshBody();
         this.walls.create(800, 460, 'wall_color').setScale(3, 1).refreshBody();
 
-        this.walls.create(400, 150, 'wall_color').setScale(1, 10).refreshBody();
-        this.walls.create(600, 150, 'wall_color').setScale(1, 10).refreshBody();
+        this.walls.create(400, 150, 'officepartition').setScale(1, 10).refreshBody();
+        this.walls.create(600, 150, 'officepartition').setScale(1, 10).refreshBody();
 
-        this.walls.create(980, 100, 'wall_color').setScale(3, 5).refreshBody();
+        this.walls.create(980, 100, 'printer').setScale(3, 5).setAngle(90).setDisplaySize(128, 64).refreshBody();
 
-        this.walls.create(980, 300, 'wall_color').setScale(3, 5).refreshBody();
+        this.walls.create(980, 240, 'writingtable').setScale(3, 5).setAngle(90).setDisplaySize(128, 80).refreshBody();
 
         const exclusionGraphics = this.make.graphics({ x: 0, y: 0 });
         exclusionGraphics.fillStyle(0xff00ff); // Purple
@@ -252,7 +258,7 @@ export class Game extends Scene {
         this.mainChar.setTexture('trashcan').setScale(4);
         this.mainBody.setSize(this.mainChar.width, this.mainChar.height);
 
-        this.time.delayedCall(3000, () => {
+        this.time.delayedCall(2000, () => {
             this.isTrashCan = false;
             this.mainChar.setTexture('plant').setScale(this.normalCharacterScale);
             // Reset body size to plant's raw texture size
