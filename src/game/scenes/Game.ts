@@ -4,7 +4,8 @@ import { EventBus } from '../EventBus';
 
 export class Game extends Scene {
     background: GameObjects.Image;
-    mainChar: GameObjects.Image;
+    mainChar: Phaser.Physics.Arcade.Image; // Change from GameObjects.Image
+    mainBody: Phaser.Physics.Arcade.Body;
     title: GameObjects.Text;
     logoTween: Phaser.Tweens.Tween | null;
     arrow: GameObjects.Image;
@@ -19,7 +20,9 @@ export class Game extends Scene {
     actionIndex: number = 0;
     normalCharacterScale: number = 1;
     grownCharacterScale: number = 2.5;
-    smallCharacterScale: number = 0.2;
+    smallCharacterScale: number = 0.5;
+    walls: Phaser.Physics.Arcade.StaticGroup;
+    breakableWalls: Phaser.Physics.Arcade.StaticGroup;
 
     constructor() {
         super('Game');
@@ -28,11 +31,46 @@ export class Game extends Scene {
     create() {
         this.background = this.add.image(512, 384, 'background');
 
-        this.mainChar = this.add.image(512, 300, 'plant').setDepth(100).setScale(this.normalCharacterScale);
+        this.mainChar = this.physics.add.image(512, 300, 'plant').setScale(1);
+
+        // 2. Cast the body once for easy access
+        this.mainBody = this.mainChar.body as Phaser.Physics.Arcade.Body;
+
+        // 3. Set world boundaries so they don't fly off screen
+        this.mainChar.setCollideWorldBounds(true);
 
         this.arrow = this.add.image(this.mainChar.x, this.mainChar.y, 'arrow').setDepth(101).setOrigin(0, 0.5).setScale(0.15);
 
         const spaceBar = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+
+        const graphics = this.make.graphics({ x: 0, y: 0 });
+        graphics.fillStyle(0x888888); // Grey color
+        graphics.fillRect(0, 0, 32, 32);
+        graphics.generateTexture('wall_color', 32, 32);
+
+        this.walls = this.physics.add.staticGroup();
+
+        this.walls.create(200, 200, 'wall_color').setScale(4, 1).refreshBody();
+        this.walls.create(600, 400, 'wall_color').setScale(1, 4).refreshBody();
+
+        const redGraphics = this.make.graphics({ x: 0, y: 0 });
+        redGraphics.fillStyle(0xff0000);
+        redGraphics.fillRect(0, 0, 32, 32);
+        redGraphics.generateTexture('wall_breakable', 32, 32);
+
+        this.breakableWalls = this.physics.add.staticGroup();
+        this.breakableWalls.create(400, 300, 'wall_breakable').setScale(4, 1).refreshBody();
+
+        this.physics.add.collider(this.mainChar, this.walls, () => {
+            this.isMoving = false;
+            this.mainBody.setVelocity(0, 0);
+        });
+
+        this.physics.add.collider(this.mainChar, this.breakableWalls, () => {
+            this.isMoving = false;
+            this.mainBody.setVelocity(0, 0);
+        });
+
 
         this.anims.create({
             key: 'explode_anim',
@@ -83,37 +121,81 @@ export class Game extends Scene {
         }
     }
 
+    pushAwayFromWalls(group: Phaser.Physics.Arcade.StaticGroup, targetWidth: number, targetHeight: number) {
+        group.getChildren().forEach((wall) => {
+            const wallBody = (wall as Phaser.Physics.Arcade.Image).body as Phaser.Physics.Arcade.StaticBody;
+
+            const distX = this.mainChar.x - wallBody.center.x;
+            const distY = this.mainChar.y - wallBody.center.y;
+
+            const minDistX = (wallBody.width / 2) + (targetWidth / 2);
+            const minDistY = (wallBody.height / 2) + (targetHeight / 2);
+
+            if (Math.abs(distX) < minDistX && Math.abs(distY) < minDistY) {
+                const pushX = distX < 0 ? -(minDistX - Math.abs(distX)) : (minDistX - Math.abs(distX));
+                const pushY = distY < 0 ? -(minDistY - Math.abs(distY)) : (minDistY - Math.abs(distY));
+
+                if (Math.abs(pushX) < Math.abs(pushY)) {
+                    this.mainChar.x += pushX;
+                } else {
+                    this.mainChar.y += pushY;
+                }
+            }
+        });
+    }
+
+    growCharacter() {
+        const targetWidth = this.mainChar.width * this.grownCharacterScale;
+        const targetHeight = this.mainChar.height * this.grownCharacterScale;
+
+        this.pushAwayFromWalls(this.walls, targetWidth, targetHeight);
+        this.pushAwayFromWalls(this.breakableWalls, targetWidth, targetHeight);
+
+        this.tweens.add({
+            targets: this.mainChar,
+            scale: this.grownCharacterScale,
+            duration: 300,
+            ease: 'Cubic.out',
+            overwrite: true,
+        });
+    }
+
     explodeCharacter() {
         this.mainChar.setVisible(false);
+
+        const targetWidth = this.mainChar.width * this.normalCharacterScale;
+        const targetHeight = this.mainChar.height * this.normalCharacterScale;
+
+        this.pushAwayFromWalls(this.walls, targetWidth, targetHeight);
+        this.pushAwayFromWalls(this.breakableWalls, targetWidth, targetHeight);
+
+        const explosionRange = 150;
+        this.breakableWalls.getChildren().forEach((wall) => {
+            const wallImage = wall as Phaser.Physics.Arcade.Image;
+            const dist = Phaser.Math.Distance.Between(
+                this.mainChar.x, this.mainChar.y,
+                wallImage.x, wallImage.y
+            );
+            if (dist < explosionRange) {
+                wallImage.destroy();
+            }
+        });
+
         this.mainChar.setScale(this.normalCharacterScale);
 
-        // 2. Create a temporary sprite at the character's location
         const explosion = this.add.sprite(this.mainChar.x, this.mainChar.y, 'explosion');
-
-        // 3. Play the animation we defined in create()
         explosion.play('explode_anim').on('animationcomplete', () => {
             explosion.destroy();
             this.mainChar.setVisible(true);
         });
     }
-
-    growCharacter() {
-        this.tweens.add({
-            targets: this.mainChar,
-            scale: this.grownCharacterScale,
-            duration: 300,          // Time in milliseconds
-            ease: 'Cubic.out',      // Smooth deceleration
-            overwrite: true         // Prevents conflicts if you spam the button
-        });
-    }
-
     shrinkCharacter() {
         this.tweens.add({
             targets: this.mainChar,
             scale: this.smallCharacterScale,
             duration: 300,
             ease: 'Cubic.out',
-            overwrite: true
+            overwrite: true,
         });
     }
 
@@ -125,39 +207,48 @@ export class Game extends Scene {
     }
 
     update(time: number, delta: number) {
+        if (!this.mainBody) return; // Type Guard
+
+        this.physics.collide(this.mainChar, this.walls);
+        this.physics.collide(this.mainChar, this.breakableWalls);
+
         if (this.isMoving) {
-            const step = this.speed * delta;
+            const dist = Phaser.Math.Distance.Between(
+                this.mainChar.x, this.mainChar.y,
+                this.targetX, this.targetY
+            );
 
-            // Move toward the point
-            const dist = Phaser.Math.Distance.Between(this.mainChar.x, this.mainChar.y, this.targetX, this.targetY);
+            // Use a 5-10 pixel threshold to prevent "jitter" at the destination
+            if (dist > 10) {
+                const angle = Phaser.Math.Angle.Between(
+                    this.mainChar.x, this.mainChar.y,
+                    this.targetX, this.targetY
+                );
 
-            if (dist > step) {
-                const angle = Phaser.Math.Angle.Between(this.mainChar.x, this.mainChar.y, this.targetX, this.targetY);
-                this.mainChar.x += Math.cos(angle) * step;
-                this.mainChar.y += Math.sin(angle) * step;
+                // Speed is now in Pixels Per Second (e.g., 300)
+                const moveSpeed = 400;
+                this.mainBody.setVelocity(
+                    Math.cos(angle) * moveSpeed,
+                    Math.sin(angle) * moveSpeed
+                );
             } else {
-                // We reached the target!
-                this.mainChar.x = this.targetX;
-                this.mainChar.y = this.targetY;
+                // REACHED TARGET: Stop velocity and snap to exact pixel
+                this.mainBody.setVelocity(0, 0);
+                this.mainChar.setPosition(this.targetX, this.targetY);
                 this.isMoving = false;
             }
         }
 
-        // 1. Get the angle from character to mouse (in Radians)
-        const angle = Phaser.Math.Angle.Between(
-            this.mainChar.x,
-            this.mainChar.y,
-            this.input.activePointer.x,
-            this.input.activePointer.y
+        // Arrow Orbit Logic (Remains similar)
+        const orbitAngle = Phaser.Math.Angle.Between(
+            this.mainChar.x, this.mainChar.y,
+            this.input.activePointer.x, this.input.activePointer.y
         );
 
-        // 2. Use Math.cos and Math.sin to find the point on the circle
-        // Formula: x = center + radius * cos(angle), y = center + radius * sin(angle)
-        this.arrow.x = this.mainChar.x + Math.cos(angle) * this.orbitRadius;
-        this.arrow.y = this.mainChar.y + Math.sin(angle) * this.orbitRadius;
-
-        // 3. Rotate the arrow so it points away from the character (toward the mouse)
-        this.arrow.rotation = angle;
+        const dynamicRadius = this.orbitRadius * (this.mainChar.scale / 2);
+        this.arrow.x = this.mainChar.x + Math.cos(orbitAngle) * dynamicRadius;
+        this.arrow.y = this.mainChar.y + Math.sin(orbitAngle) * dynamicRadius;
+        this.arrow.rotation = orbitAngle;
     }
 
 
