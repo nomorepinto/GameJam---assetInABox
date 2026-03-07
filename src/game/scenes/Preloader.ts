@@ -53,7 +53,7 @@ export class Preloader extends Scene {
         this.load.audio('retry_snd', 'retry.wav');
         this.load.audio('bounce_snd', 'bounce off.wav');
         this.load.audio('trash_snd', 'trash lol.wav');
-        this.load.audio('music', 'flickering dreams.mp3');
+        this.load.audio('music', 'flickering dreams(extended).wav');
         this.load.audio('win_snd', 'win.wav');
     }
 
