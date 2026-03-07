@@ -47,6 +47,13 @@ export class Preloader extends Scene {
             frameWidth: 128,
             frameHeight: 128
         });
+
+        this.load.setPath('sounds');
+        this.load.audio('explosion_snd', 'bombaclat.wav');
+        this.load.audio('retry_snd', 'retry.wav');
+        this.load.audio('bounce_snd', 'bounce off.wav');
+        this.load.audio('trash_snd', 'trash lol.wav');
+        this.load.audio('music', 'lock in (only map 2).wav');
     }
 
     create() {

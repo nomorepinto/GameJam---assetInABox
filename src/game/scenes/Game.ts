@@ -47,6 +47,7 @@ export class Game extends Scene {
     isShowingAlert: boolean = false;
     startTime: number;
     elapsedTime: number = 0;
+    bgMusic: Phaser.Sound.BaseSound;
 
     constructor() {
         super('Game');
@@ -57,6 +58,8 @@ export class Game extends Scene {
         // ==========================================
         // DECLARATIONS: Textures, keys, animations
         // ==========================================
+
+        this.bgMusic = this.sound.add('music', { loop: true, volume: 0.5 });
 
         // Input key
         const spaceBar = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
@@ -153,6 +156,7 @@ export class Game extends Scene {
                 this.currentAction.push('move');
                 this.currentAction.push('trashcan');
                 console.log('Trashcan picked up! Actions:', this.currentAction);
+                this.sound.play('trash_snd');
             }
         });
 
@@ -224,6 +228,7 @@ export class Game extends Scene {
 
         this.startTime = this.time.now;
         this.elapsedTime = 0;
+        this.bgMusic.play();
 
         // Spacebar action handler
         spaceBar.on('down', () => {
@@ -309,6 +314,8 @@ export class Game extends Scene {
     }
 
     resetPlayer() {
+        this.sound.play('retry_snd');
+        this.bgMusic.stop();
         this.isMoving = false;
         this.mainBody.setVelocity(0, 0);
         this.mainBody.reset(70, 670);
@@ -347,6 +354,7 @@ export class Game extends Scene {
 
     becomeTrashCan() {
         this.isTrashCan = true;
+        this.sound.play('trash_snd');
         this.mainChar.setTexture('trashcan').setScale(4);
         this.mainBody.setSize(this.mainChar.width, this.mainChar.height);
 
@@ -362,6 +370,7 @@ export class Game extends Scene {
         if (!this.isMoving) return;
         this.isMoving = false;
         this.mainBody.setVelocity(0, 0);
+        this.sound.play('bounce_snd');
 
         let bounceX = this.mainChar.x - this.moveDirX * this.moveDistance / 1.5;
         let bounceY = this.mainChar.y - this.moveDirY * this.moveDistance / 1.5;
@@ -446,6 +455,7 @@ export class Game extends Scene {
 
     explodeCharacter() {
         this.mainChar.setVisible(false);
+        this.sound.play('explosion_snd');
 
         const targetWidth = this.mainChar.width * this.normalCharacterScale;
         const targetHeight = this.mainChar.height * this.normalCharacterScale;
@@ -531,6 +541,7 @@ export class Game extends Scene {
             this.mainChar.y >= 89 && this.mainChar.y <= 189
         ) {
             this.hasWon = true;
+            this.bgMusic.stop();
             this.isMoving = false;
             this.mainBody.setVelocity(0, 0);
             EventBus.emit('player-wins', { time: this.elapsedTime });
