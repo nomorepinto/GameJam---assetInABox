@@ -16,7 +16,7 @@ export class Game extends Scene {
     targetY: number = 0;
     moveDistance: number = 200;
     speed: number = 0.5;
-    currentAction: Array<String> = ["explode", "move", "grow", "move", "shrink"];
+    currentAction: Array<String> = ["explode", "move", "grow", "move", "shrink", "move"];
     actionIndex: number = 0;
     normalCharacterScale: number = 1;
     grownCharacterScale: number = 2.5;
@@ -24,7 +24,9 @@ export class Game extends Scene {
     walls: Phaser.Physics.Arcade.StaticGroup;
     breakableWalls: Phaser.Physics.Arcade.StaticGroup;
     hasKey: boolean = false;
+    hasKey2: boolean = false;
     keyObject: Phaser.Physics.Arcade.Image;
+    keyObject2: Phaser.Physics.Arcade.Image;
     moveDirX: number = 0;
     moveDirY: number = 0;
     bounceBackSpeed: number = 800;
@@ -34,6 +36,17 @@ export class Game extends Scene {
     isTrashCan: boolean = false;
     exclusionZones: Phaser.Physics.Arcade.StaticGroup;
     hasWon: boolean = false;
+    worker1: GameObjects.Image;
+    worker2: GameObjects.Image;
+    worker4: GameObjects.Image;
+    boss: GameObjects.Image;
+    deskPC: GameObjects.Image;
+    coffeeMaker: GameObjects.Image;
+    cabinet: GameObjects.Image;
+    sink: GameObjects.Image;
+    isShowingAlert: boolean = false;
+    startTime: number;
+    elapsedTime: number = 0;
 
     constructor() {
         super('Game');
@@ -41,52 +54,97 @@ export class Game extends Scene {
 
     create() {
 
+        // ==========================================
+        // DECLARATIONS: Textures, keys, animations
+        // ==========================================
+
+        // Input key
+        const spaceBar = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+
+        // Wall texture (grey)
+        const graphics = this.make.graphics({ x: 0, y: 0 });
+        graphics.fillStyle(0xbdcdde);
+        graphics.fillRect(0, 0, 32, 32);
+        graphics.generateTexture('wall_color', 32, 32);
+
+        // Key texture (yellow)
+        const keyGraphics = this.make.graphics({ x: 0, y: 0 });
+        keyGraphics.fillStyle(0xffff00);
+        keyGraphics.fillRect(0, 0, 32, 32);
+        keyGraphics.generateTexture('key', 32, 32);
+
+        // Office partition texture (brown)
+        const officepartition = this.make.graphics({ x: 0, y: 0 });
+        officepartition.fillStyle(0x804b34);
+        officepartition.fillRect(0, 0, 32, 32);
+        officepartition.generateTexture('officepartition', 32, 32);
+
+        // Breakable wall texture (red)
+        const redGraphics = this.make.graphics({ x: 0, y: 0 });
+        redGraphics.fillStyle(0xff0000);
+        redGraphics.fillRect(0, 0, 32, 32);
+        redGraphics.generateTexture('wall_breakable', 32, 32);
+
+        // Key door texture (yellow)
+        const doorGraphics = this.make.graphics({ x: 0, y: 0 });
+        doorGraphics.fillStyle(0x9dcdf5);
+        doorGraphics.fillRect(0, 0, 32, 32);
+        doorGraphics.generateTexture('key_door', 32, 32);
+
+        // Exclusion zone texture (purple)
+        const exclusionGraphics = this.make.graphics({ x: 0, y: 0 });
+        exclusionGraphics.fillStyle(0xff00ff);
+        exclusionGraphics.fillRect(0, 0, 32, 32);
+        exclusionGraphics.generateTexture('exclusion_zone', 32, 32);
+
+        // Explode animation
+        this.anims.create({
+            key: 'explode_anim',
+            frames: this.anims.generateFrameNumbers('explosion', { start: 0, end: 6 }),
+            frameRate: 12,
+            hideOnComplete: true
+        });
+
+        // ==========================================
+        // OBJECT CREATION: Scene objects & physics
+        // ==========================================
+
         this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
             console.log(`x: ${pointer.x}, y: ${pointer.y}`);
         });
 
         this.background = this.add.image(512, 384, 'background');
 
-        this.mainChar = this.physics.add.image(100, 100, 'plant').setScale(1);
-
-        // 2. Cast the body once for easy access
+        this.mainChar = this.physics.add.image(70, 670, 'plant').setScale(1);
         this.mainBody = this.mainChar.body as Phaser.Physics.Arcade.Body;
-
-        // 3. Set world boundaries so they don't fly off screen
         this.mainChar.setCollideWorldBounds(false);
 
         this.arrow = this.add.image(this.mainChar.x, this.mainChar.y, 'arrow').setDepth(101).setOrigin(0, 0.5).setScale(0.15);
 
-        const spaceBar = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
-
-        const graphics = this.make.graphics({ x: 0, y: 0 });
-        graphics.fillStyle(0xbdcdde); // Grey color
-        graphics.fillRect(0, 0, 32, 32);
-        graphics.generateTexture('wall_color', 32, 32);
-
-        //key
-        const keyGraphics = this.make.graphics({ x: 0, y: 0 });
-        keyGraphics.fillStyle(0xffff00); // Yellow
-        keyGraphics.fillRect(0, 0, 32, 32);
-        keyGraphics.generateTexture('key', 32, 32);
-
-
-        const officepartition = this.make.graphics({ x: 0, y: 0 });
-        officepartition.fillStyle(0x804b34);
-        officepartition.fillRect(0, 0, 32, 32);
-        officepartition.generateTexture('officepartition', 32, 32);
-
-        this.keyObject = this.physics.add.image(500, 70, 'key').setScale(0.5).setDepth(105)
+        // Key object
+        this.keyObject = this.physics.add.image(400, 712, 'key').setScale(0.5).setDepth(105);
 
         this.physics.add.overlap(this.mainChar, this.keyObject, () => {
             if (!this.hasKey) {
                 this.hasKey = true;
                 this.keyObject.destroy();
-                console.log('Key picked up! hasKey:', this.hasKey);
+                console.log('Key 1 picked up! hasKey:', this.hasKey);
             }
         });
 
-        this.trashCan = this.physics.add.image(70, 700, 'trashcan').setScale(4);
+        // Key 2 object
+        this.keyObject2 = this.physics.add.image(825, 687, 'key').setScale(0.5).setDepth(105);
+
+        this.physics.add.overlap(this.mainChar, this.keyObject2, () => {
+            if (!this.hasKey2) {
+                this.hasKey2 = true;
+                this.keyObject2.destroy();
+                console.log('Key 2 picked up! hasKey2:', this.hasKey2);
+            }
+        });
+
+        // Trash can
+        this.trashCan = this.physics.add.image(60, 60, 'trashcan').setScale(4);
 
         this.physics.add.overlap(this.mainChar, this.trashCan, () => {
             if (!this.hasTrashCan) {
@@ -98,30 +156,28 @@ export class Game extends Scene {
             }
         });
 
-        //walls
 
+        this.boss = this.add.image(120, 170, 'boss').setAngle(180).setScale(2);
+        this.worker1 = this.add.image(565, 585, 'worker1').setAngle(90).setOrigin(1, 0).setScale(2);
+        this.deskPC = this.add.image(565, 685, 'desk-pc').setAngle(90).setOrigin(1, 0).setScale(2);
+        this.worker2 = this.add.image(365, 585, 'worker2').setAngle(90).setOrigin(1, 0).setScale(2);
+        this.worker4 = this.add.image(365, 685, 'worker4').setAngle(90).setOrigin(1, 0).setScale(2);
+
+        this.coffeeMaker = this.add.image(1020, 689, 'coffeemaker').setAngle(90).setOrigin(1, 0).setScale(2).setDepth(105);
+        this.cabinet = this.add.image(760, 453, 'cabinet').setAngle(90).setOrigin(1, 0).setScale(2).setDepth(105);
+        this.cabinet = this.add.image(760, 510, 'cabinet').setAngle(90).setOrigin(1, 0).setScale(2).setDepth(105);
+        this.sink = this.add.image(987, 539, 'sink').setAngle(90).setOrigin(1, 0).setScale(2);
+
+
+
+
+        // Physics groups
         this.walls = this.physics.add.staticGroup();
-
-
-        const redGraphics = this.make.graphics({ x: 0, y: 0 });
-        redGraphics.fillStyle(0xff0000);
-        redGraphics.fillRect(0, 0, 32, 32);
-        redGraphics.generateTexture('wall_breakable', 32, 32);
-
         this.breakableWalls = this.physics.add.staticGroup();
-
-
-
-
-        const doorGraphics = this.make.graphics({ x: 0, y: 0 });
-        doorGraphics.fillStyle(0xffff00);
-        doorGraphics.fillRect(0, 0, 32, 32);
-        doorGraphics.generateTexture('key_door', 32, 32);
-
         this.keyDoors = this.physics.add.staticGroup();
+        this.exclusionZones = this.physics.add.staticGroup();
 
-
-
+        // Colliders
         this.physics.add.collider(this.mainChar, this.walls, () => this.bounceBack());
         this.physics.add.collider(this.mainChar, this.breakableWalls, () => this.bounceBack());
         this.physics.add.collider(this.mainChar, this.keyDoors, () => {
@@ -129,60 +185,47 @@ export class Game extends Scene {
             this.bounceBack();
         });
 
-        // Top
+        // Walls — Top
         this.walls.create(512, 16, 'wall_color').setScale(32, 1).refreshBody();
-        // Bottom
+        // Walls — Bottom
         this.walls.create(512, 752, 'wall_color').setScale(32, 1).refreshBody();
-        // Left
+        // Walls — Left
         this.walls.create(16, 384, 'wall_color').setScale(1, 24).refreshBody();
-        // Right
-        this.walls.create(1008, 284, 'wall_color').setScale(1, 24).refreshBody();
-        //Exit
-        this.keyDoors.create(1008, 700, 'key_door').setScale(1, 3).refreshBody();
+        // Walls — Right
+        this.walls.create(990, 190, 'wall_color').setScale(1, 24).setOrigin(0, 0).refreshBody();
+        this.walls.create(990, 95, 'wall_color').setScale(1, 5).setOrigin(0, 1).refreshBody();
+        // Exit
+        this.keyDoors.create(990, 95, 'key_door').setScale(1, 3).setOrigin(0, 0).refreshBody();
 
-        this.walls.create(100, 200, 'wall_color').setScale(5, 1).refreshBody();
-        this.breakableWalls.create(160, 115, 'wall_breakable').setScale(1, 5).
-            refreshBody();
+        this.walls.create(366, 735, 'officepartition').setScale(0.5, 8).setOrigin(0, 1).refreshBody();
+        this.walls.create(380, 478, 'officepartition').setScale(3, 0.5).setOrigin(1, 0).refreshBody();
 
-        this.walls.create(250, 600, 'officepartition').setDisplaySize(32, 32 * 10).setScale(1, 10).refreshBody();
-        this.walls.create(500, 600, 'officepartition').setScale(1, 10).refreshBody();
-        this.walls.create(750, 600, 'wall_color').setScale(1, 10).refreshBody();
-        this.walls.create(800, 460, 'wall_color').setScale(3, 1).refreshBody();
+        this.walls.create(566, 735, 'officepartition').setScale(0.5, 8).setOrigin(0, 1).refreshBody();
+        this.walls.create(580, 478, 'officepartition').setScale(3, 0.5).setOrigin(1, 0).refreshBody();
 
-        this.walls.create(400, 150, 'officepartition').setScale(1, 10).refreshBody();
-        this.walls.create(600, 150, 'officepartition').setScale(1, 10).refreshBody();
+        this.walls.create(30, 214, 'wall_color').setScale(7, 1).setOrigin(0, 0).refreshBody();
+        this.walls.create(252, 245, 'wall_color').setScale(1, 3).setOrigin(1, 1).refreshBody();
 
-        this.walls.create(980, 100, 'printer').setScale(3, 5).setAngle(90).setDisplaySize(128, 64).refreshBody();
+        this.walls.create(743, 735, 'wall_color').setScale(1, 12).setOrigin(0, 1).refreshBody();
+        this.walls.create(741, 350, 'wall_color').setScale(5, 1).setOrigin(0, 0).refreshBody();
 
-        this.walls.create(980, 240, 'writingtable').setScale(3, 5).setAngle(90).setDisplaySize(128, 80).refreshBody();
-
-        const exclusionGraphics = this.make.graphics({ x: 0, y: 0 });
-        exclusionGraphics.fillStyle(0xff00ff); // Purple
-        exclusionGraphics.fillRect(0, 0, 32, 32);
-        exclusionGraphics.generateTexture('exclusion_zone', 32, 32);
-
-        this.exclusionZones = this.physics.add.staticGroup();
-        this.exclusionZones.create(500, 144, 'exclusion_zone').setScale(5.5, 5.5).setAlpha(0).refreshBody();
+        // Exclusion zone
+        this.exclusionZones.create(293, 493, 'exclusion_zone').setScale(8.4, 8).setOrigin(0, 0).setAlpha(0).refreshBody();
 
         this.physics.add.overlap(this.mainChar, this.exclusionZones, () => {
             if (!this.isTrashCan) {
                 this.isMoving = false;
                 this.mainBody.setVelocity(0, 0);
-                this.mainBody.reset(100, 100);
-                this.mainChar.setPosition(100, 100);
+                this.mainBody.reset(70, 670);
+                this.mainChar.setPosition(70, 670);
+                this.showMessage("Why is this plant moving? A trash can wouldn't be so suspicious.");
             }
         });
 
+        this.startTime = this.time.now;
+        this.elapsedTime = 0;
 
-        // explode animation
-        this.anims.create({
-            key: 'explode_anim',
-            frames: this.anims.generateFrameNumbers('explosion', { start: 0, end: 6 }),
-            frameRate: 12,
-            hideOnComplete: true // Automatically hides the sprite when the animation ends
-        });
-
-
+        // Spacebar action handler
         spaceBar.on('down', () => {
             const action = this.currentAction[this.actionIndex];
 
@@ -215,16 +258,65 @@ export class Game extends Scene {
                 this.actionIndex = 0;
             }
         });
+
         EventBus.on('reset-player', () => this.resetPlayer());
         EventBus.emit('current-scene-ready', this);
+    }
+
+    showMessage(message: string) {
+        if (this.isShowingAlert) return;
+        this.isShowingAlert = true;
+
+        const container = this.add.container(512, 100).setDepth(2000).setAlpha(0);
+
+        const background = this.add.graphics();
+        background.fillStyle(0x000000, 0.8);
+        background.fillRoundedRect(-300, -40, 600, 80, 15);
+        background.lineStyle(3, 0x9dcdf5, 1);
+        background.strokeRoundedRect(-300, -40, 600, 80, 15);
+
+        const text = this.add.text(0, 0, message, {
+            fontSize: '22px',
+            fontFamily: 'Arial',
+            color: '#ffffff',
+            align: 'center',
+            wordWrap: { width: 550 }
+        }).setOrigin(0.5);
+
+        container.add([background, text]);
+
+        this.tweens.add({
+            targets: container,
+            alpha: 1,
+            y: 150,
+            duration: 400,
+            ease: 'Cubic.out'
+        });
+
+        this.time.delayedCall(4000, () => {
+            this.tweens.add({
+                targets: container,
+                alpha: 0,
+                y: 100,
+                duration: 400,
+                ease: 'Cubic.in',
+                onComplete: () => {
+                    container.destroy();
+                    this.isShowingAlert = false;
+                }
+            });
+        });
     }
 
     resetPlayer() {
         this.isMoving = false;
         this.mainBody.setVelocity(0, 0);
-        this.mainBody.reset(100, 100);
-        this.mainChar.setPosition(100, 100);
+        this.mainBody.reset(70, 670);
+        this.mainChar.setPosition(70, 670);
         this.actionIndex = 0;
+        this.elapsedTime = 0;
+        this.startTime = this.time.now;
+        this.hasWon = false;
 
         // Revert to plant if currently a trashcan
         if (this.isTrashCan) {
@@ -401,23 +493,54 @@ export class Game extends Scene {
     update(time: number, delta: number) {
 
         if (!this.mainBody) return; // Type Guard
+        if (!this.hasWon) {
+            this.elapsedTime = (this.time.now - this.startTime) / 1000;
+        }
+
+        // Define your bounds
+        let bounds = {
+            left: 0,
+            right: 1024,  // or use a fixed value
+            top: 0,
+            bottom: 768
+        };
+
+        // Check if player is out of bounds
+        if (this.mainChar.x < bounds.left ||
+            this.mainChar.x > bounds.right ||
+            this.mainChar.y < bounds.top ||
+            this.mainChar.y > bounds.bottom) {
+
+            this.mainChar.setPosition(70, 670);
+
+            // Optional: reset velocity if using physics
+            this.mainBody.setVelocity(0, 0);
+        }
 
         this.keyDoors.getChildren().forEach((door) => {
             const body = (door as Phaser.Physics.Arcade.Image).body as Phaser.Physics.Arcade.StaticBody;
-            body.enable = !this.hasKey;
+            body.enable = !(this.hasKey && this.hasKey2);
         });
 
-        // Win condition — player enters exit zone with key
+        // Win condition — player enters exit zone with BOTH keys
         if (
             this.hasKey &&
+            this.hasKey2 &&
             !this.hasWon &&
-            this.mainChar.x >= 990 && this.mainChar.x <= 1022 &&
-            this.mainChar.y >= 669 && this.mainChar.y <= 735
+            this.mainChar.x >= 975 &&
+            this.mainChar.y >= 89 && this.mainChar.y <= 189
         ) {
             this.hasWon = true;
             this.isMoving = false;
             this.mainBody.setVelocity(0, 0);
-            EventBus.emit('player-wins');
+            EventBus.emit('player-wins', { time: this.elapsedTime });
+        } else if (
+            (!this.hasKey || !this.hasKey2) &&
+            !this.hasWon &&
+            this.mainChar.x >= 975 &&
+            this.mainChar.y >= 89 && this.mainChar.y <= 189
+        ) {
+            this.showMessage("The window is locked, I have to find both keys.");
         }
 
         this.physics.collide(this.mainChar, this.walls);

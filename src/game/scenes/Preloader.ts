@@ -34,7 +34,15 @@ export class Preloader extends Scene {
         this.load.image('trashcan', 'Trash.png');
         this.load.image('sink', 'sink.png');
         this.load.image('printer', 'printer.png');
-        this.load.image('writingtable', 'writing-table.png')
+        this.load.image('writingtable', 'writing-table.png');
+        this.load.image('worker1', 'worker1.png');
+        this.load.image('worker2', 'worker2.png');
+        this.load.image('worker4', 'worker4.png');
+        this.load.image('boss', 'boss.png');
+        this.load.image('desk-pc', 'desk-with-pc.png');
+        this.load.image('coffeemaker', 'coffee-maker.png');
+        this.load.image('cabinet', 'cabinet.png');
+
         this.load.spritesheet('explosion', 'explosionAnimation.png', {
             frameWidth: 128,
             frameHeight: 128
