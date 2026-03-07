@@ -542,6 +542,7 @@ export class Game extends Scene {
         ) {
             this.hasWon = true;
             this.bgMusic.stop();
+            this.sound.play('win_snd');
             this.isMoving = false;
             this.mainBody.setVelocity(0, 0);
             EventBus.emit('player-wins', { time: this.elapsedTime });
